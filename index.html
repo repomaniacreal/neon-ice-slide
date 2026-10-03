@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Neon Ice Slide</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { background:#050a18; }
+  body {
+    font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
+    color:#eaf2ff; min-height:100vh;
+    display:flex; justify-content:center; align-items:flex-start;
+    background:radial-gradient(1200px 700px at 50% -10%, #0b1e42 0%, #050a18 60%);
+    user-select:none; -webkit-user-select:none; touch-action:manipulation;
+  }
+  #wrap { width:100%; max-width:480px; padding:10px 12px 18px; }
+  #hud { display:flex; align-items:center; justify-content:space-between; padding:8px 4px; gap:6px; }
+  .pill {
+    background:rgba(10,20,44,.85); border:2px solid #2a4a8e; border-radius:16px;
+    padding:6px 10px 8px; text-align:center; min-width:58px;
+  }
+  .pill .num { font-size:18px; font-weight:bold; color:#7dd8ff; text-shadow:0 0 10px #35a0ff; line-height:1.2; }
+  .pill .lbl { font-size:9px; font-weight:bold; letter-spacing:2px; color:#eaf2ff; }
+  .hbtn {
+    background:rgba(10,20,44,.85); color:#fff; border:2px solid #2a4a8e; border-radius:14px;
+    font-size:16px; font-weight:bold; padding:8px 10px; cursor:pointer; font-family:inherit;
+  }
+  .hbtn:active { transform:scale(.94); }
+  #stage {
+    position:relative; width:100%; border-radius:16px; overflow:hidden;
+    border:2px solid #2a4a8e; box-shadow:0 0 24px rgba(53,160,255,.2);
+    background:#070d1e; touch-action:none;
+  }
+  canvas { display:block; width:100%; height:auto; }
+  #hint { text-align:center; font-size:13px; color:#9fc4e8; margin:10px 4px 4px; line-height:1.6; }
+  #overPop {
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(3,6,16,.72); z-index:5;
+  }
+  #overCard {
+    background:rgba(12,22,50,.96); border:3px solid #35a0ff; border-radius:22px;
+    box-shadow:0 0 34px rgba(53,160,255,.4);
+    padding:26px 32px; text-align:center; animation:pop .25s ease-out; min-width:250px;
+  }
+  @keyframes pop { from { transform:scale(.7); opacity:0; } to { transform:scale(1); opacity:1; } }
+  #overCard h1 { font-size:24px; color:#fff; text-shadow:0 0 14px #35a0ff; letter-spacing:1px; margin-bottom:6px; }
+  #stars { font-size:38px; letter-spacing:6px; margin:8px 0 4px; }
+  #stars .on { color:#ffd94d; text-shadow:0 0 14px #ffd94d; display:inline-block; animation:starpop .5s backwards; }
+  #stars .on:nth-child(2) { animation-delay:.3s; }
+  #stars .on:nth-child(3) { animation-delay:.6s; }
+  @keyframes starpop { 0% { transform:scale(0) rotate(-50deg); } 60% { transform:scale(1.5) rotate(12deg); } 100% { transform:scale(1) rotate(0); } }
+  #stars .off { color:#2a3a5e; }
+  #overCard .sc { font-size:14px; color:#b9cdee; margin:4px 0; }
+  #overCard .sc b { color:#fff; font-size:18px; }
+  #newBestTag { display:none; color:#ffd94d; font-weight:bold; font-size:15px; margin:6px 0;
+    text-shadow:0 0 10px #ffd94d; animation:blink 0.7s infinite alternate; }
+  @keyframes blink { from { opacity:1; } to { opacity:.55; } }
+  .bigbtn {
+    margin:12px 6px 0; font-family:inherit; font-size:17px; font-weight:bold; letter-spacing:2px;
+    color:#06121f; background:linear-gradient(180deg,#9fe4ff,#35a0ff);
+    border:none; border-radius:16px; padding:12px 26px; cursor:pointer;
+    box-shadow:0 0 18px rgba(53,160,255,.55);
+  }
+  .bigbtn:active { transform:scale(.94); }
+  .bigbtn.ghost { background:rgba(53,160,255,.12); color:#9fe4ff; box-shadow:none; border:2px solid #35a0ff; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div class="pill"><div class="num" id="level">1</div><div class="lbl">LEVEL</div></div>
+    <div class="pill"><div class="num" id="moves">0</div><div class="lbl">MOVES</div></div>
+    <div class="pill"><div class="num" id="starsGot">0/0</div><div class="lbl">STARS</div></div>
+    <button class="hbtn" id="lives" title="Lives" disabled style="opacity:1">❤️❤️❤️</button>
+    <button class="hbtn" id="restartBtn" title="Restart level">⟳</button>
+    <button class="hbtn" id="muteBtn" title="Sound">🔊</button>
+  </div>
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="overPop">
+      <div id="overCard">
+        <h1 id="overTitle">LEVEL COMPLETE!</h1>
+        <div id="stars"><span class="on">★</span><span class="on">★</span><span class="on">★</span></div>
+        <div class="sc" id="overMoves">MOVES <b>0</b></div>
+        <div class="sc" id="overScore">SCORE <b>0</b></div>
+        <div id="newBestTag">★ NEW BEST! ★</div>
+        <div><button class="bigbtn ghost" id="replayBtn">REPLAY</button><button class="bigbtn" id="nextBtn">NEXT</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="hint"><b>Swipe</b> to slide — the cube slides till it hits a wall 🧊<br>Collect all ⭐ — don't fall in the pits! 🕳️</div>
+</div>
+<script>
+'use strict';
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+const W = 400, H = 640, TILE = 40;
+cv.width = W; cv.height = H;
+
+/* ---------- audio ---------- */
+let AC = null, muted = false;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, when, slideTo) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const t = ac.currentTime + (when || 0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(vol || 0.15, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noiseBurst(dur, vol, low) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const n = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ac.createBufferSource(); src.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = low || 1000;
+  const g = ac.createGain(); g.gain.value = vol || 0.2;
+  src.connect(f); f.connect(g); g.connect(ac.destination);
+  src.start();
+}
+const sfx = {
+  slide() { noiseBurst(0.18, 0.1, 2400); },
+  bump()  { tone(140, 0.1, 'square', 0.12, 0, 90); },
+  star(c) { tone(740 + c * 130, 0.16, 'triangle', 0.15); tone(1110 + c * 130, 0.14, 'sine', 0.09, 0.05); },
+  fall()  { tone(500, 0.5, 'sine', 0.16, 0, 90); noiseBurst(0.3, 0.12, 600); },
+  win()   { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'triangle', 0.14, i * 0.11)); },
+  over()  { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.22, 'triangle', 0.14, i * 0.14)); },
+  fanfare(){ [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.22, 'triangle', 0.13, i * 0.1)); },
+  click() { tone(600, 0.06, 'triangle', 0.1); }
+};
+
+/* ---------- levels ---------- */
+// # wall, . floor, S start, * star, O pit
+const LEVELS = [
+  ["#########",
+   "#.......#",
+   "#.......#",
+   "#..S....#",
+   "#.......#",
+   "#......*#",
+   "#.......#",
+   "#.*.....#",
+   "#########"],
+  ["#########",
+   "#.......#",
+   "#.......#",
+   "#..S..*.#",
+   "#.......#",
+   "#.#####.#",
+   "#.......#",
+   "#.*...*.#",
+   "#########"],
+  ["#########",
+   "#.*.....#",
+   "#.......#",
+   "#...O...#",
+   "#...S...#",
+   "#.......#",
+   "#.....O.#",
+   "#.....*.#",
+   "#########"],
+  ["#########",
+   "#...#...#",
+   "#...#*..#",
+   "#...#...#",
+   "#..*....#",
+   "#*#####.#",
+   "#.......#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#...*...#",
+   "#.##.##.#",
+   "#.......#",
+   "#*......#",
+   "#.##.##.#",
+   "#......*#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#...#...#",
+   "#*..#..*#",
+   "#.......#",
+   "###.###.#",
+   "#...*...#",
+   "#...#...#",
+   "#...S*..#",
+   "#########"],
+  ["#########",
+   "#.*.....#",
+   "#.#####.#",
+   "#......*#",
+   "#####.#.#",
+   "#..*..#.#",
+   "#.#####.#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#..O...*#",
+   "#.......#",
+   "#.#####.#",
+   "#.......#",
+   "#*....O*#",
+   "#.#####.#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#.*###..#",
+   "#..#.#..#",
+   "#*.#.#..#",
+   "#.......#",
+   "#..#.#..#",
+   "#..#.#..#",
+   "#.*S#...#",
+   "#########"],
+  ["#########",
+   "#O.....O#",
+   "#.......#",
+   "#.......#",
+   "#...#...#",
+   "#.*.**.*#",
+   "#.......#",
+   "#O..S..O#",
+   "#########"],
+  ["#########",
+   "#...O...#",
+   "#......*#",
+   "#.......#",
+   "#.O.O.O.#",
+   "#.......#",
+   "#......*#",
+   "#.*.S...#",
+   "#########"],
+  ["#########",
+   "#.......#",
+   "#.O...O.#",
+   "#*..*...#",
+   "#.......#",
+   "#.......#",
+   "#.O...O.#",
+   "#*..S...#",
+   "#########"],
+  ["#########",
+   "#.*.....#",
+   "#.#####*#",
+   "#.......#",
+   "#.......#",
+   "#.#####.#",
+   "#*......#",
+   "#..*S...#",
+   "#########"],
+  ["#########",
+   "#...#...#",
+   "#...#...#",
+   "#.......#",
+   "####.####",
+   "#...*...#",
+   "#*..#...#",
+   "#..*S..*#",
+   "#########"],
+  ["#########",
+   "#*...*..#",
+   "#.##.##.#",
+   "#.##.##.#",
+   "#...*...#",
+   "#*......#",
+   "#.##.##.#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#.##.##.#",
+   "#.......#",
+   "#.##*##.#",
+   "#*......#",
+   "#.##.##.#",
+   "#.......#",
+   "#..*S...#",
+   "#########"],
+  ["#########",
+   "#.......#",
+   "#.#####.#",
+   "#.#...#.#",
+   "#.#.O.#.#",
+   "#*#...#.#",
+   "#.#####*#",
+   "#...S*..#",
+   "#########"],
+  ["#########",
+   "#.......#",
+   "#.......#",
+   "#..###..#",
+   "#..#.#.*#",
+   "#*.###..#",
+   "#.......#",
+   "#...S*..#",
+   "#########"],
+  ["#########",
+   "#.......#",
+   "#.O...O.#",
+   "#......*#",
+   "#...#...#",
+   "#...*...#",
+   "#.O...O*#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#..O.O..#",
+   "#......*#",
+   "#*##.##.#",
+   "#.......#",
+   "#.##.##*#",
+   "#...O...#",
+   "#...S*..#",
+   "#########"],
+  ["#########",
+   "#..*....#",
+   "#*#####.#",
+   "#.#.....#",
+   "#.#.###.#",
+   "#.#.#.*.#",
+   "#.#.#.###",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#*..#...#",
+   "#...#..*#",
+   "#...#...#",
+   "#.......#",
+   "#...#...#",
+   "#...#...#",
+   "#...S*..#",
+   "#########"],
+  ["#########",
+   "#.#.#.#.#",
+   "#......*#",
+   "#.#.#.#.#",
+   "#*......#",
+   "#.#.#.#.#",
+   "#.......#",
+   "#...S.*.#",
+   "#########"],
+  ["#########",
+   "#.##.##.#",
+   "#.#...#.#",
+   "#.#...#.#",
+   "#.#.#.#*#",
+   "#*#...#.#",
+   "#.##.##.#",
+   "#...S.*.#",
+   "#########"],
+  ["#########",
+   "#.#.#.#.#",
+   "#.#.#.#*#",
+   "#*......#",
+   "#.......#",
+   "#.......#",
+   "#*#.#.#.#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#...#..*#",
+   "#...#...#",
+   "#.......#",
+   "#.#####.#",
+   "#......*#",
+   "#*..#...#",
+   "#...S...#",
+   "#########"],
+  ["#########",
+   "#.....#.#",
+   "#*###.#.#",
+   "#.#.*.#.#",
+   "#.#.###.#",
+   "#.#.....#",
+   "#.#####.#",
+   "#.*.S.*.#",
+   "#########"],
+  ["#########",
+   "#.....*.#",
+   "#.##....#",
+   "#..##...#",
+   "#.......#",
+   "#...##..#",
+   "#.*..##.#",
+   "#...S*..#",
+   "#########"],
+  ["#########",
+   "#.#...#.#",
+   "#.#*#.#.#",
+   "#...#...#",
+   "###.#.###",
+   "#...#*..#",
+   "#.#*#.#.#",
+   "#.#...S.#",
+   "#########"],
+  ["#########",
+   "#.#..*..#",
+   "#.#.###.#",
+   "#.#.#...#",
+   "#.#.#.###",
+   "#...#*..#",
+   "#.#####*#",
+   "#...S...#",
+   "#########"]
+];
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/* ---------- state ---------- */
+let state = 'title'; // title | playing | clear | gameover | allclear
+let level = 1, grid = [], GW = 0, GH = 0, ox = 0, oy = 0;
+let stars = [], startPos = { x: 1, y: 1 };
+let cube, lives, moves, score = 0, best = parseInt(localStorage.getItem('neonIceBest') || '0', 10) || 0;
+let parts = [], popups = [], time = 0, shake = 0, newBest = false, par = 0;
+let celebrateT = 0, fireworkT = 0, rockets = [], grandFinale = false;
+let maxUnlocked = parseInt(localStorage.getItem('neonIceLevel') || '1', 10) || 1;
+let starData = {};
+try { starData = JSON.parse(localStorage.getItem('neonIceStars') || '{}'); } catch (e) { starData = {}; }
+
+function parseLevel(n) {
+  const rows = LEVELS[n - 1];
+  GH = rows.length; GW = rows[0].length;
+  grid = []; stars = [];
+  for (let y = 0; y < GH; y++) {
+    grid.push([]);
+    for (let x = 0; x < GW; x++) {
+      const ch = rows[y][x];
+      if (ch === 'S') { startPos = { x, y }; grid[y].push('.'); }
+      else if (ch === '*') { stars.push({ x, y, taken: false }); grid[y].push('.'); }
+      else grid[y].push(ch);
+    }
+  }
+  ox = (W - GW * TILE) / 2;
+  oy = 96 + (H - 96 - GH * TILE) / 2;
+}
+// BFS shortest solution -> par for star rating (also used by tests to prove solvable)
+function solvePar() {
+  const si = stars.map((s, i) => i);
+  const starAt = {};
+  stars.forEach((s, i) => { starAt[s.x + ',' + s.y] = i; });
+  const all = (1 << stars.length) - 1;
+  const seen = new Set([startPos.x + ',' + startPos.y + ',0']);
+  const q = [{ x: startPos.x, y: startPos.y, m: 0, d: 0 }];
+  while (q.length) {
+    const cur = q.shift();
+    if (cur.m === all) return cur.d;
+    for (const [dx, dy] of DIRS) {
+      let x = cur.x, y = cur.y, m = cur.m, dead = false;
+      for (;;) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= GW || ny >= GH || grid[ny][nx] === '#') break;
+        x = nx; y = ny;
+        if (grid[y][x] === 'O') { dead = true; break; }
+        if (starAt[x + ',' + y] !== undefined) m |= (1 << starAt[x + ',' + y]);
+      }
+      if (dead || (x === cur.x && y === cur.y)) continue;
+      const k = x + ',' + y + ',' + m;
+      if (!seen.has(k)) { seen.add(k); q.push({ x, y, m, d: cur.d + 1 }); }
+    }
+  }
+  return -1; // unsolvable
+}
+function buildLevel(n) {
+  level = n; moves = 0; lives = 3;
+  parts = []; popups = []; rockets = []; shake = 0;
+  celebrateT = 0; fireworkT = 0; grandFinale = false;
+  parseLevel(n);
+  par = solvePar();
+  cube = { x: startPos.x, y: startPos.y, sliding: false, path: [], pi: 0, t: 0, dur: 0.3, falling: false, ft: 0 };
+  updateHUD();
+  document.getElementById('overPop').style.display = 'none';
+}
+function startGame() {
+  audio();
+  level = Math.min(maxUnlocked, LEVELS.length);
+  buildLevel(level);
+  state = 'playing';
+  sfx.click();
+}
+function updateHUD() {
+  document.getElementById('level').textContent = level;
+  document.getElementById('moves').textContent = moves;
+  document.getElementById('starsGot').textContent = stars.filter(s => s.taken).length + '/' + stars.length;
+  document.getElementById('lives').textContent = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(Math.max(0, 3 - lives));
+}
+function boom(x, y, color, n, spd, grav) {
+  for (let i = 0; i < (n || 10); i++) {
+    const a = Math.random() * 6.28, s = (spd || 130) * (0.3 + Math.random() * 0.9);
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, r: 1.5 + Math.random() * 3, life: 1, color, grav: grav || 0 });
+  }
+}
+function popup(x, y, text, color, size) {
+  popups.push({ x, y, text, color: color || '#fff', size: size || 18, life: 1.2 });
+}
+function tileXY(x, y) { return { x: ox + (x + 0.5) * TILE, y: oy + (y + 0.5) * TILE }; }
+
+/* ---------- gameplay ---------- */
+// returns {path:[[x,y]...], pit:bool} — path excludes start tile
+function slidePath(x, y, dx, dy) {
+  const path = [];
+  let cx = x, cy = y;
+  for (;;) {
+    const nx = cx + dx, ny = cy + dy;
+    if (nx < 0 || ny < 0 || nx >= GW || ny >= GH || grid[ny][nx] === '#') break;
+    cx = nx; cy = ny;
+    path.push([cx, cy]);
+    if (grid[cy][cx] === 'O') return { path, pit: true };
+  }
+  return { path, pit: false };
+}
+function slide(dx, dy) {
+  if (state !== 'playing' || cube.sliding) return;
+  const r = slidePath(Math.round(cube.x), Math.round(cube.y), dx, dy);
+  if (r.path.length === 0) return; // already against wall
+  moves++;
+  cube.sliding = true;
+  cube.path = r.path;
+  cube.sx = Math.round(cube.x); cube.sy = Math.round(cube.y);
+  cube.pi = 0; cube.t = 0;
+  cube.dur = 0.1 + r.path.length * 0.035;
+  cube.pit = r.pit;
+  cube.got = 0;
+  sfx.slide();
+  updateHUD();
+}
+function collectStar(s) {
+  s.taken = true;
+  cube.got++;
+  const mult = cube.got;
+  const pts = 100 * mult;
+  score += pts;
+  const p = tileXY(s.x, s.y);
+  const label = mult === 1 ? '+' + pts : mult === 2 ? '+' + pts + ' DOUBLE!' : mult === 3 ? '+' + pts + ' TRIPLE!' : '+' + pts + ' MEGA x' + mult + '!';
+  popup(p.x, p.y - 20, label, '#ffd94d', mult > 1 ? 20 : 16);
+  boom(p.x, p.y, '#ffd94d', 12, 160, 150);
+  sfx.star(mult);
+  updateHUD();
+}
+function endSlide() {
+  cube.sliding = false;
+  if (cube.pit) {
+    // fell in!
+    cube.falling = true; cube.ft = 0;
+    lives--;
+    sfx.fall();
+    shake = Math.max(shake, 5);
+    const p = tileXY(cube.x, cube.y);
+    boom(p.x, p.y, '#9d5bff', 18, 180, 300);
+    updateHUD();
+    return;
+  }
+  sfx.bump();
+  shake = Math.max(shake, 2.5);
+  if (stars.every(s => s.taken)) onLevelClear();
+}
+function resetCube() {
+  cube.x = startPos.x; cube.y = startPos.y;
+  cube.sliding = false; cube.falling = false; cube.path = [];
+}
+function onLevelClear() {
+  state = 'clear';
+  celebrateT = 0; fireworkT = 0;
+  grandFinale = level >= LEVELS.length;
+  // opening volley
+  for (let i = 0; i < 3; i++) rockets.push({ x: 60 + i * 140 + Math.random() * 40, y: H + 10, vy: -(300 + Math.random() * 120), targetY: 140 + Math.random() * 180, color: ['#ffd94d', '#ff6fd8', '#7dd8ff'][(Math.random() * 3) | 0] });
+  const got = moves <= par + 2 ? 3 : moves <= par + 6 ? 2 : 1;
+  newBest = (starData[level] || 0) < got;
+  if (newBest) { starData[level] = got; localStorage.setItem('neonIceStars', JSON.stringify(starData)); }
+  if (level >= maxUnlocked && level < LEVELS.length) { maxUnlocked = level + 1; localStorage.setItem('neonIceLevel', String(maxUnlocked)); }
+  if (score > best) { best = score; localStorage.setItem('neonIceBest', String(best)); }
+  sfx.win();
+  for (let i = 0; i < got; i++) setTimeout(() => sfx.star(i + 2), 400 + i * 240);
+  const cx = W / 2, cy = H / 2;
+  for (let i = 0; i < 36; i++) boom(cx + (Math.random() - 0.5) * 220, cy + (Math.random() - 0.5) * 160, ['#ffd94d', '#7dd8ff', '#ff6fd8'][(Math.random() * 3) | 0], 1, 220);
+  const lastLevel = level >= LEVELS.length;
+  document.getElementById('overTitle').textContent = lastLevel ? 'ALL LEVELS CLEAR!' : 'LEVEL ' + level + ' COMPLETE!';
+  document.getElementById('stars').style.display = lastLevel ? 'none' : 'block';
+  document.getElementById('overMoves').innerHTML = 'MOVES <b>' + moves + '</b> (PAR ' + par + ')';
+  document.getElementById('overScore').innerHTML = 'SCORE <b>' + score + '</b>';
+  document.getElementById('newBestTag').style.display = newBest && score >= best ? 'block' : 'none';
+  const spans = document.getElementById('stars').children;
+  for (let i = 0; i < 3; i++) spans[i].className = i < got ? 'on' : 'off';
+  document.getElementById('nextBtn').textContent = lastLevel ? 'PLAY AGAIN' : 'NEXT';
+  document.getElementById('replayBtn').style.display = lastLevel ? 'none' : '';
+  setTimeout(() => { document.getElementById('overPop').style.display = 'flex'; }, 1900);
+  updateHUD();
+}
+function onGameOver() {
+  state = 'gameover';
+  if (score > best) { best = score; newBest = true; localStorage.setItem('neonIceBest', String(best)); }
+  else newBest = false;
+  sfx.fall(); setTimeout(() => sfx.over(), 400);
+  document.getElementById('overTitle').textContent = 'OUT OF LIVES!';
+  document.getElementById('stars').style.display = 'none';
+  document.getElementById('overMoves').innerHTML = 'LEVEL <b>' + level + '</b>';
+  document.getElementById('overScore').innerHTML = 'SCORE <b>' + score + '</b>';
+  document.getElementById('newBestTag').style.display = newBest ? 'block' : 'none';
+  document.getElementById('nextBtn').textContent = 'RETRY';
+  document.getElementById('replayBtn').style.display = 'none';
+  document.getElementById('overPop').style.display = 'flex';
+  updateHUD();
+}
+/* ---------- effects (particles, popups, fireworks) ---------- */
+function updateFx(dt) {
+  time += dt;
+  // celebration fireworks
+  if (state === 'clear') {
+    celebrateT += dt;
+    fireworkT -= dt;
+    if (fireworkT <= 0) {
+      fireworkT = 0.32;
+      const cols = ['#ffd94d', '#ff6fd8', '#7dd8ff', '#9d5bff', '#4dff6a'];
+      rockets.push({ x: 40 + Math.random() * (W - 80), y: H + 10, vy: -(280 + Math.random() * 140), targetY: 110 + Math.random() * 220, color: cols[(Math.random() * cols.length) | 0] });
+      tone(280 + Math.random() * 320, 0.25, 'sine', 0.05, 0, 950);
+    }
+  }
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i];
+    r.y += r.vy * dt;
+    parts.push({ x: r.x + (Math.random() - 0.5) * 4, y: r.y, vx: (Math.random() - 0.5) * 30, vy: 40, r: 2, life: 0.35, color: r.color, grav: 0 });
+    if (r.y <= r.targetY) {
+      rockets.splice(i, 1);
+      boom(r.x, r.y, r.color, 26, 250, 170);
+      boom(r.x, r.y, '#ffffff', 8, 150, 110);
+      tone(200, 0.3, 'triangle', 0.09, 0, 70);
+      shake = Math.max(shake, 2);
+    }
+  }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i];
+    q.x += q.vx * dt; q.y += q.vy * dt; q.vy += (q.grav || 0) * dt;
+    q.life -= dt * 1.8;
+    if (q.life <= 0) parts.splice(i, 1);
+  }
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.y -= 28 * dt; p.life -= dt * 0.9;
+    if (p.life <= 0) popups.splice(i, 1);
+  }
+  shake = Math.max(0, shake - dt * 26);
+}
+
+function update(dt) {
+  if (cube.sliding) {
+    cube.t += dt;
+    const p = Math.min(1, cube.t / cube.dur);
+    // ease-out slide
+    const e = 1 - Math.pow(1 - p, 2);
+    const target = cube.path[cube.path.length - 1];
+    // interpolate from slide start
+    const fromX = cube.sx, fromY = cube.sy;
+    cube.x = fromX + (target[0] - fromX) * e;
+    cube.y = fromY + (target[1] - fromY) * e;
+    // collect stars passed
+    for (const s of stars) {
+      if (s.taken) continue;
+      // star collected if cube has passed its tile: check segment coverage
+      const dx = Math.sign(target[0] - fromX), dy = Math.sign(target[1] - fromY);
+      let hit = false;
+      if (dx !== 0 && s.y === fromY) {
+        const lo = Math.min(fromX, target[0]), hi = Math.max(fromX, target[0]);
+        hit = s.x >= lo - 0.01 && s.x <= hi + 0.01 && s.x * dx <= (fromX + (target[0] - fromX) * e) * dx + 0.01;
+      } else if (dy !== 0 && s.x === fromX) {
+        const lo = Math.min(fromY, target[1]), hi = Math.max(fromY, target[1]);
+        hit = s.y >= lo - 0.01 && s.y <= hi + 0.01 && s.y * dy <= (fromY + (target[1] - fromY) * e) * dy + 0.01;
+      }
+      if (hit) collectStar(s);
+    }
+    if (Math.random() < 0.6) {
+      const cp = tileXY(cube.x, cube.y);
+      parts.push({ x: cp.x + (Math.random() - 0.5) * 20, y: cp.y + (Math.random() - 0.5) * 20, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, r: 1 + Math.random() * 2, life: 0.5, color: '#9fe4ff', grav: 0 });
+    }
+    if (p >= 1) {
+      cube.x = target[0]; cube.y = target[1];
+      endSlide();
+    }
+  } else if (cube.falling) {
+    cube.ft += dt;
+    if (cube.ft > 0.55) {
+      cube.falling = false;
+      if (lives <= 0) onGameOver();
+      else resetCube();
+    }
+  }
+  updateFx(dt);
+}
+
+/* ---------- render ---------- */
+function starPath(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rr2 = i % 2 === 0 ? r : r * 0.45;
+    const a = -Math.PI / 2 + i * Math.PI / 5;
+    const px = x + Math.cos(a) * rr2, py = y + Math.sin(a) * rr2;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+function render() {
+  const bg = ctx.createRadialGradient(W / 2, H * 0.35, 40, W / 2, H / 2, 460);
+  bg.addColorStop(0, '#0b1e42'); bg.addColorStop(1, '#050a18');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const px = ox + x * TILE, py = oy + y * TILE;
+    const ch = grid[y][x];
+    if (ch === '#') {
+      ctx.fillStyle = '#274a7d';
+      ctx.fillRect(px, py, TILE, TILE);
+      ctx.fillStyle = '#3f6cab';
+      ctx.fillRect(px + 3, py + 3, TILE - 6, 8);
+      ctx.fillStyle = 'rgba(255,255,255,.14)';
+      ctx.fillRect(px + 3, py + 3, 10, TILE - 6);
+    } else {
+      ctx.fillStyle = (x + y) % 2 ? '#0d1830' : '#0f1c38';
+      ctx.fillRect(px, py, TILE, TILE);
+      if ((x * 7 + y * 13) % 5 === 0) {
+        ctx.fillStyle = 'rgba(160,210,255,.08)';
+        ctx.fillRect(px + 8 + ((x * 31 + y * 17) % 18), py + 10 + ((x * 13 + y * 29) % 16), 3, 3);
+      }
+      if (ch === 'O') {
+        ctx.save();
+        ctx.shadowColor = '#9d5bff'; ctx.shadowBlur = 12;
+        ctx.fillStyle = '#020204';
+        ctx.beginPath(); ctx.ellipse(px + TILE / 2, py + TILE / 2, TILE / 2 - 4, TILE / 2 - 6, 0, 0, 6.29); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = '#9d5bff'; ctx.lineWidth = 2; ctx.globalAlpha = 0.7;
+        ctx.beginPath(); ctx.ellipse(px + TILE / 2, py + TILE / 2, TILE / 2 - 4, TILE / 2 - 6, 0, 0, 6.29); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+  // board frame glow
+  ctx.strokeStyle = 'rgba(53,160,255,.35)'; ctx.lineWidth = 3;
+  ctx.strokeRect(ox - 3, oy - 3, GW * TILE + 6, GH * TILE + 6);
+
+  for (const s of stars) {
+    if (s.taken) continue;
+    const p = tileXY(s.x, s.y);
+    const tw = 1 + 0.12 * Math.sin(time * 5 + s.x * 2 + s.y);
+    ctx.save();
+    ctx.translate(p.x, p.y + Math.sin(time * 3 + s.x) * 2);
+    ctx.scale(tw, tw);
+    ctx.shadowColor = '#ffd94d'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#ffd94d';
+    starPath(0, 0, 12); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff3c4';
+    starPath(0, 0, 5); ctx.fill();
+    ctx.restore();
+  }
+
+  // cube
+  if (!(cube.falling && cube.ft > 0.4)) {
+    const p = tileXY(cube.x, cube.y);
+    let sc = 1;
+    if (cube.falling) sc = Math.max(0.1, 1 - cube.ft * 1.8);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.scale(sc, sc);
+    if (cube.sliding) {
+      ctx.strokeStyle = 'rgba(159,228,255,.5)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-30, 0); ctx.stroke();
+    }
+    ctx.shadowColor = '#7dd8ff'; ctx.shadowBlur = 18;
+    const cg = ctx.createLinearGradient(-13, -13, 13, 13);
+    cg.addColorStop(0, '#cfeeff'); cg.addColorStop(0.5, '#7dd8ff'); cg.addColorStop(1, '#3f9fe0');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    const r = 7, s2 = 13;
+    ctx.moveTo(-s2 + r, -s2); ctx.arcTo(s2, -s2, s2, s2, r); ctx.arcTo(s2, s2, -s2, s2, r);
+    ctx.arcTo(-s2, s2, -s2, -s2, r); ctx.arcTo(-s2, -s2, s2, -s2, r); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fillRect(-8, -9, 10, 5);
+    // eyes
+    ctx.fillStyle = '#0b1e42';
+    ctx.beginPath(); ctx.arc(-4, 1, 2.4, 0, 6.29); ctx.arc(5, 1, 2.4, 0, 6.29); ctx.fill();
+    ctx.restore();
+  }
+
+  for (const q of parts) {
+    ctx.globalAlpha = Math.max(0, q.life);
+    ctx.fillStyle = q.color;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.r * q.life + 0.5, 0, 6.29); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  for (const p of popups) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+    ctx.font = 'bold ' + p.size + 'px Trebuchet MS';
+    ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+    ctx.fillText(p.text, p.x, p.y);
+    ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
+
+  // celebration banner
+  if (state === 'clear') {
+    const sc = Math.min(1, celebrateT * 3.5);
+    const pop = sc < 1 ? 1 + 0.35 * Math.sin(sc * Math.PI) : 1 + 0.03 * Math.sin(time * 6);
+    ctx.save();
+    ctx.translate(W / 2, H / 2 - 130);
+    ctx.scale(pop, pop);
+    ctx.textAlign = 'center';
+    ctx.font = grandFinale ? 'bold 30px Trebuchet MS' : 'bold 46px Trebuchet MS';
+    ctx.fillStyle = '#ffd94d';
+    ctx.shadowColor = '#ffd94d'; ctx.shadowBlur = 26;
+    ctx.fillText(grandFinale ? '🏆 CHAMPION! 🏆' : 'CLEAR!', 0, 0);
+    ctx.restore();
+  }
+
+  if (state === 'title') {
+    ctx.fillStyle = 'rgba(3,6,16,.66)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#35a0ff'; ctx.shadowBlur = 16;
+    ctx.font = 'bold 36px Trebuchet MS';
+    ctx.fillText('NEON ICE', W / 2, H / 2 - 150);
+    ctx.fillText('SLIDE', W / 2, H / 2 - 108);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#b9cdee'; ctx.font = '16px Trebuchet MS';
+    ctx.fillText('Swipe to slide — the cube slides', W / 2, H / 2 - 56);
+    ctx.fillText('until it hits a wall!', W / 2, H / 2 - 32);
+    ctx.fillText('Collect all ⭐ • Avoid pits 🕳️', W / 2, H / 2 - 8);
+    ctx.fillStyle = '#7dd8ff'; ctx.font = 'bold 21px Trebuchet MS';
+    ctx.fillText('— TAP TO START —', W / 2, H / 2 + 40);
+    if (best > 0) { ctx.fillStyle = '#ffd94d'; ctx.font = 'bold 16px Trebuchet MS'; ctx.fillText('BEST: ' + best, W / 2, H / 2 + 74); }
+  }
+}
+
+/* ---------- loop ---------- */
+let last = 0;
+function frame(t) {
+  const dt = Math.min(0.05, (t - last) / 1000 || 0.016);
+  last = t;
+  if (state === 'playing') update(dt);
+  else if (state === 'clear') updateFx(dt);
+  else time += dt;
+  render();
+  requestAnimationFrame(frame);
+}
+buildLevel(Math.min(maxUnlocked, LEVELS.length));
+state = 'title';
+requestAnimationFrame(frame);
+
+/* ---------- input ---------- */
+const stage = document.getElementById('stage');
+let pDown = null;
+stage.addEventListener('pointerdown', e => {
+  audio();
+  pDown = { x: e.clientX, y: e.clientY };
+  if (state === 'title') { startGame(); pDown = null; return; }
+  if (e.cancelable) e.preventDefault();
+});
+stage.addEventListener('pointerup', e => {
+  if (!pDown || state !== 'playing') { pDown = null; return; }
+  const dx = e.clientX - pDown.x, dy = e.clientY - pDown.y;
+  pDown = null;
+  if (Math.hypot(dx, dy) < 24) return;
+  if (Math.abs(dx) > Math.abs(dy)) slide(dx > 0 ? 1 : -1, 0);
+  else slide(0, dy > 0 ? 1 : -1);
+  if (e.cancelable) e.preventDefault();
+});
+stage.addEventListener('pointercancel', () => { pDown = null; });
+stage.addEventListener('contextmenu', e => e.preventDefault());
+
+document.getElementById('restartBtn').addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation();
+  if (state === 'playing' || state === 'gameover') { sfx.click(); buildLevel(level); state = 'playing'; }
+});
+document.getElementById('muteBtn').addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation(); audio();
+  muted = !muted;
+  document.getElementById('muteBtn').textContent = muted ? '🔇' : '🔊';
+});
+document.getElementById('nextBtn').addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation(); sfx.click();
+  if (state === 'gameover') { buildLevel(level); }
+  else if (level >= LEVELS.length) { score = 0; buildLevel(1); }
+  else { buildLevel(level + 1); }
+  state = 'playing';
+});
+document.getElementById('replayBtn').addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation(); sfx.click();
+  buildLevel(level); state = 'playing';
+});
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') slide(0, -1);
+  else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') slide(0, 1);
+  else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') slide(-1, 0);
+  else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') slide(1, 0);
+  else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (state === 'title') startGame(); }
+  else if (e.key === 'm' || e.key === 'M') document.getElementById('muteBtn').click();
+});
+</script>
+</body>
+</html>
